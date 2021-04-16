@@ -1,0 +1,468 @@
+---
+title: "Data quality check Report - RMRP 2021"
+author: "R4V Regional Platform"
+date: " `r format(Sys.Date(),  '%d %B %Y')`"
+always_allow_html: yes
+output:
+  r4vstyle::unhcr_templ_html:
+    toc: true
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning= FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      message = FALSE, 
+                      warning = FALSE, 
+                      collapse = FALSE,
+                      comment = "#>",
+                      fig.align = "center")
+knitr::opts_chunk$set(fig.width = 12, fig.height = 9)
+set.seed(1)
+extrafont::loadfonts(quiet=TRUE)
+options(scipen = 999) # turn-off scientific notation like 1e+48
+library(unhcRstyle)
+library(forcats)
+library(ggplot2)
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(plotly)
+library(DT)
+library(knitr)
+```
+
+
+```{r getdata}
+
+df2021 <- read_excel('./data-raw/RMRP_2021_AI_activities.xlsx')
+
+dfindicator <- read_excel( './data-raw/RMRP_2021_AI_indicators.xlsx')
+
+dfGIS <-  read_excel('./data-raw/RMRP_2021_AI_GIS.xlsx')
+
+
+```
+
+## Introduction
+
+The `RMRP 2021` is a database located on Activity Info server that contains the activities'information reported monthly by **`r n_distinct(df2021$Country)`** countries in the Americas region for the *Response for Venezuelans* situation in 2021.
+
+To the date of this report, **`r n_distinct(df2021$Appealing.Organization.Name)`** organisations reported a total of **`r nrow(df2021)`** activities.  
+
+Despite that the Activity Info database contains validation rules and restrictions, some of the activities reported do have errors, that can then lead to misinterpretation of the results. For this reason, we developed a script to detect those errors and offer the concerned operations the possibility to modify their data or confirm that the value is correct. The following report is in mirror of the "Quality check report generator" developped by the regional platform, that can ben found and executed with the r4v_error_report() command in the 0_Run_analysis script. 
+
+For an easier lecture, the sections of the document will be divided in the same order they appear in Activity Info: Who / When / What / Where / To whom
+
+we first display some general statistics to get an overview of the total numbers of activities, before entering into the details of the quality check
+
+```{r report, echo=FALSE}
+df2021$Reporting.Month<- as.factor(df2021$Reporting.Month)
+df2021%>%
+ mutate(Repoting.Month = factor(Reporting.Month,c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")))%>%
+  ggplot() +
+  aes(x = Reporting.Month , y = Country) +
+  scale_x_discrete(limits = rev(levels(df2021$Reporting.Month)))+
+  geom_tile(size = 1L) +
+  labs(title = "Activity reported per month", subtitle = "Blanks correspond to months where the country did not report any activity") +
+  unhcr_theme()
+
+```
+
+```{r sector, echo=FALSE}
+
+ggplot(df2021) +
+ aes(x = Country, y = Sector...Subsector...WG) +
+ geom_tile(size = 1L) +
+  labs(title = "Activity reported per sector per country", subtitle = "Blanks correspond to months where the country do not have reported activities", x ="Country of reporting", y = "Sector") +
+unhcr_theme() +
+   theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1))+ coord_flip()
+
+
+```
+
+## Get the report of your errors
+
+To get the complete error report, go to the R Script "2_quality_check_error_report_generator". You will be able to have a complete report in an XLS format and be able to quickly identify the activities that contain errors and the type of errors for each activity.
+
+### Checking empty mandatory text or selection values
+
+One of the way to ensure the quality of data is to make the relevant fields mandatory. To initiate, we will check which one of the mandatory fields have missing values.
+
+For the moment, and to avoid errors, we will only check the fields that are not depending of any skip logic or validation rules from a parent field as those will be checked later in each dedicated subsections. Those fields are: Appealing organisation Name, Implementation Set-up, Sector, Reporting month, Indicator, Activity name, COVID-19 Situation, RMRP Activity, CVA, Country, Admin1
+
+``` {r NA, echo = FALSE} 
+df2021mandatory <- df2021%>%
+  select(Appealing.Organization.Name, Implementation.Set.up, Sector...Subsector...WG, Reporting.Month,
+         Indicator, Activity.name, COVID.19.situation, RMRP.Activity,
+         CVA, Country, Admin1)
+df2021NA <- data.frame(colSums(is.na(df2021mandatory)))
+colnames(df2021NA)[1] <- "Number of missing values"
+
+```
+
+```{r NA2, echo = FALSE} 
+if(colSums(df2021NA) == 0) {
+  print("None of the mandatory values are missing!")
+  } else
+  {df2021NA}
+
+```
+
+
+## Who: Appealing organisation and Implementing partners
+
+``` {r percentage}
+
+perimp<- df2021 %>%
+  group_by(Implementation.Set.up)%>%
+summarise(count = n())%>%
+  mutate(perc = round((count / sum(count) * 100),1))%>%
+  filter(Implementation.Set.up == "Yes")
+```
+
+As mentioned in the introduction, **`r n_distinct(df2021$Appealing.Organization.Name)`** organisations have been reporting actvities so far. Out of the total of activities,**`r perimp$count`** are implemented through partners, representing a **`r perimp$perc` % ** of all the activities. 
+
+In those cases, it is important to highlight the work of those partners that are participating in the setup and don't leave those information blank. The graph below
+represents the number of entries where the implementing partner is missing. 
+```{r blankIP}
+
+missingIP<- df2021%>%
+  filter(Implementation.Set.up == "Yes", is.na(Implementing.partner.Name))
+  
+if(nrow(missingIP) == 0) {
+  print("None of the implementing partners values are missing!")
+} else {
+  ggplot(missingIP)+
+  aes(x=Country)+
+  geom_text(stat='count', aes(label=..count..), vjust=-1)+
+geom_bar(fill = "#00AAAD")+
+  labs(title = "Activities with no implementing partner registered", subtitle = "Filter applied: Implementing Set-Up = Yes", x= "Country", y ="Number of activities")+
+  unhcr_theme()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+} 
+```
+
+
+## What: Sectors, indicators and activity related information
+
+Activities with no sector registered
+```{r blanksector}
+if (is.na(df2021$Sector...Subsector...WG) == 0) {
+  print("None of the Sector values are missing!")
+} else { 
+df2021%>%
+  filter(is.na(Sector...Subsector...WG))%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_text(stat='count', aes(label=..count..), vjust=-1)+
+geom_bar(fill = "#00AAAD")+
+  labs(title = "Activities with no sector registered", subtitle = "Applied on all data", y ="Number of activities")+
+  unhcr_theme()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+}
+```
+
+Activities with no indicator registered
+```{r blankindicator}
+
+if (is.na(df2021$Indicator) == 0) {
+  print("None of the Indicator values are missing!")
+} else { 
+df2021%>%
+  filter(is.na(Indicator))%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_text(stat='count', aes(label=..count..), vjust=-1)+
+geom_bar(fill = "#00AAAD")+
+  labs(title = "Activities with no indicator registered", subtitle = "Applied on all data", y ="Number of activities")+
+  unhcr_theme()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+} 
+```
+
+
+
+Activities with no activity name registered
+```{r blankname}
+
+if (is.na(df2021$Activity.name) == 0) {
+  print("None of the Activity name values are missing!")
+} else { 
+df2021%>%
+  filter( is.na(Activity.name))%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_text(stat='count', aes(label=..count..), vjust=-1)+
+geom_bar(fill = "#00AAAD")+
+  labs(title = "Activities with no activity name registered", subtitle = "Applied on all data", y ="Number of activities")+
+  unhcr_theme()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+} 
+```
+
+Sector and indicators are related and respect a validation process, to avoid having indicators related to the wrong sector. Below, a table exposes the number of rows where there is an error in the match between sector and indicator. If everything is correct, a text will inform you. 
+```{r mismatchindicator}
+indicatormismatch <- df2021%>%
+  anti_join(dfindicator, by = c("Sector...Subsector...WG", "Indicator"))%>%
+  summarise("Number of errors", "Count" = n())
+
+if(indicatormismatch$Count == 0) {
+  print("All the Sector and indicator values are correctly matched!")
+  } else
+  {indicatormismatch}
+
+
+```
+
+
+## CVA related activities
+
+CVA related activities contains both amount and delivery mechanism information. in this section, we'll focus on 3 types of possible mistakes: missing values, outliers and erroneously filled values. 
+
+### Amounts and mechanisms assigned to non CVA activities
+Assigning amounts and delivery mechanisms to non CVA activities can false the calculations made afterwards. We will identify rows of non CVA activity that actually contains data when it should be empty. 
+
+```{r erroneousamount}
+
+erroneousamount<- df2021%>%
+  filter(CVA == "No", (!is.na(Value.of.Transfer.in.USD)| Value.of.Transfer.in.USD != 0), !is.na(Delivery.Mechanism))
+
+if(nrow(erroneousamount)== 0) {
+print("All the indicators that are not CVA do not contain erroneous or misplaced values")
+} else {
+df2021%>%
+  filter(CVA == "No", (!is.na(Value.of.Transfer.in.USD)| Value.of.Transfer.in.USD != 0), !is.na(Delivery.Mechanism))%>%
+  ggplot() +
+  aes(x=Country)+
+  geom_bar(stat = "count")+
+    labs(title = "Non CVA Activities with CVA information", subtitle = "Review and check your non CVA indicators in the error report to locate the mistake", y ="Number of activities" , caption = "Filters applied: CVA = No, Value of transfer or Delivery mechanism is not empty or superior to 0") +
+  unhcr_theme() 
+
+  } 
+``` 
+
+## Empty values in CVA activities
+
+```{r cvaplot}
+
+cvaplot<-df2021%>%
+  filter(CVA == "Yes", (is.na(Value.of.Transfer.in.USD)|  is.na(Delivery.Mechanism)))
+
+if(nrow(cvaplot)== 0) {
+print("All the CVA indicators have complete Value and Delivery mechanism data!")
+} else {
+  ggplot(cvaplot) +
+  aes(x=Country)+
+  geom_bar(stat = "count")+
+  labs(title = "CVA Activities with missing Value of transfer or Delivery mechanism information", subtitle = "Review and check your CVA indicators in the error report to locate the mistake", y ="Number of activities" , caption = "Filters applied CVA == Yes, (!is.na(Value.of.Transfer.in.USD) |  !is.na(Delivery.Mechanism))") +
+  unhcr_theme()
+} 
+
+```
+
+## Where: missing countries or Admin 1 values, incorrect matches between countries and Admin1
+
+Empty geographical references country or Admin1
+
+```{r gisna}
+GISna <-df2021%>%
+  filter(is.na(Country) | is.na(Admin1))
+
+if(nrow(GISna)== 0) {
+print("None of the Geographical values (Country or Admin1) are missing !")
+} else {
+df2021%>%
+  filter(is.na(Country) | is.na(Admin1))%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_text(stat='count', aes(label=..count..), vjust=-1)+
+  geom_bar(fill = "#00AAAD")+
+  labs(title = "Empty geographical references", subtitle = "Please review the Country and Admin1 values", caption = "Applied on all data")+
+  unhcr_theme()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+} 
+```
+
+Country and Admin1 geographical levels are related and respect a validation process, to avoid having Admin1 level areas related to the wrong country. Below, a table exposes the number of rows where there is an error in the match between sector and indicator. If everything is correct, a text will inform you. 
+
+```{r mismatchGIS}
+GISmismatch<-df2021%>%
+  anti_join(dfGIS, by = c("Country", "Admin1"))%>%
+  summarise("Number of errors", Count = n())
+
+if(GISmismatch$Count == 0) {
+  print("All the Country and Admin1 values are correctly matched!")
+  } else
+  {indicatormismatch}
+
+
+```
+
+## To whom: Incorrect assignments of values and beneficiaries breakdowns
+
+One of the main inconsistencies identified in the previous reports is related to beneficiaries data, as Activity Info system does not detect the sums and mismatch between figures when loaded in bulk. Beneficiaries data is one of the most important and most asked information and thus it is important that this information is registered adequately and that the total values in each breakdown match. 
+
+In this section, we will run an analysis per type of indicator to separate beneficiaries related indicators and others. For this, we proceed to a table join between the activity table and the indicator table in order to later on be able to filter the data per *PIN/Target oriented* indicators  and *People* indicators. We then only keep the columns that will be used in this section. 
+
+``` {r tablejoin, echo = TRUE}
+dfindicator2 <- df2021%>%
+  left_join(dfindicator, by = c("Sector...Subsector...WG", "Indicator"))%>%
+  select(Appealing.Organization.Name, Reporting.Month,  Sector...Subsector...WG, Indicator, Country, Admin1, Quantity.of.unit.measured, Total.monthly.beneficiaries, New.beneficiaries.of.the.month, Refugees.and.Migrants.IN.DESTINATION, Refugees.and.Migrants.IN.TRANSIT, Host.Communities.Beneficiaries, Refugees.and.Migrants.PENDULARS,Colombian.Returnees, Women.under.18, Men.under.18, Women.above.18, Men.above.18, PiN.Target.Oriented, People)
+```
+
+We then calculate new columns to get the totals for both breakdowns and population type so we can do differences and identify the indicators where the totals are not corresponding. Once this calculations done, we compared the totals with the corresponding fields. In this process, we also replace **NA** values by **0**. 
+
+``` {r na to 0 and mutate, echo = TRUE}
+
+dfindicatorclean <- dfindicator2%>%
+  mutate_at(c('Refugees.and.Migrants.IN.DESTINATION', "Refugees.and.Migrants.IN.TRANSIT","Refugees.and.Migrants.PENDULARS", "Host.Communities.Beneficiaries", "Colombian.Returnees"), as.numeric)%>%
+  mutate_if(is.numeric, ~replace(., is.na(.), 0))%>%
+  mutate(total_pop_type = Refugees.and.Migrants.IN.DESTINATION+ Refugees.and.Migrants.IN.TRANSIT+ Host.Communities.Beneficiaries+ Colombian.Returnees ,total_breakdown = Women.under.18 + Men.under.18 + Women.above.18 + Men.above.18)
+```
+
+``` {r benfificiariescalc }
+dfcalc <- dfindicatorclean%>% 
+         mutate(newvsbreakdown  = ifelse(total_breakdown == New.beneficiaries.of.the.month, TRUE,FALSE),
+         newvspoptype  = ifelse(New.beneficiaries.of.the.month == total_pop_type, TRUE,FALSE))
+```
+
+With those new columnns, we can identify the indicators with differences between the figures.
+
+``` {r newvsbreakdown }
+newvsbreakdown <-dfcalc%>%
+  filter((PiN.Target.Oriented == "Yes" | People == "Yes") & newvsbreakdown == FALSE) 
+
+if(nrow(newvsbreakdown) == 0) {
+  print("All the age and gender breakdown information matches with the New beneficiaries total! ")
+} else {
+dfcalc%>%
+  filter((PiN.Target.Oriented == "Yes" | People == "Yes") & newvsbreakdown == FALSE)%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5, position = position_dodge(.9))+
+  unhcr_theme()+
+    labs(title = "New beneficiaries for the months is not equal to breakdown by age and gender", subtitle = "Filter:  Pin / Target or People oriented indicators")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+}
+
+```
+
+``` {r newvspoptype }
+newvspoptype<-dfcalc%>%
+  filter((PiN.Target.Oriented == "Yes" & newvspoptype == FALSE))
+
+if(nrow(newvspoptype) == 0) {
+  print("All the population type breakdown information matches with the New beneficiaries total! ")
+} else {
+dfcalc%>%
+  filter((PiN.Target.Oriented == "Yes" & newvspoptype == FALSE))%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5, position = position_dodge(.9))+
+  unhcr_theme()+
+    labs(title = "New beneficiaries for the months is not equal to population type", subtitle = "Filter: Only Pin / Target oriented indicators")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+} 
+
+```
+
+We do understand that breakdown information can be hard to obtain in certain contexts. For this reason, we propose to fill the empty breakdowns through national scripts with defined breakdown proportions.
+
+``` {r emptybreak }
+emptybreakdown<- dfcalc%>%
+  filter((PiN.Target.Oriented == "Yes" | People == "Yes")& New.beneficiaries.of.the.month != 0 & total_breakdown == 0)
+
+if(nrow(emptybreakdown) == 0) {
+  print("No empty age and gender breakdown found! ")
+} else {
+dfcalc%>%
+  filter((PiN.Target.Oriented == "Yes" | People == "Yes")& New.beneficiaries.of.the.month != 0 & total_breakdown == 0)%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5, position = position_dodge(.9))+
+  unhcr_theme()+
+    labs(title = "Number of indicators with no age and gender breakdown", subtitle = "Filter:  Pin / Target oriented indicators or People indicators, New beneficiaries is not 0, total breakdown is 0")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+}
+
+```
+
+"People" indicators refer to indicators were the reported information refers to people that are not part of the Persons in Need (i.e.: # of teachers trained, # of healthcare workers trained,...). Those indicators have to be breakdowned by **age and gender only**. Thus, if those indicators contains a population type breakdown (Refugees and migrants in destination, host community,...), it should be removed. 
+
+``` {r pplindicator}
+pplindicator<- dfcalc%>%
+  filter((People == "Yes" & PiN.Target.Oriented == "No") & total_pop_type != 0)
+
+if(nrow(pplindicator) == 0) {
+  print("No empty age and gender breakdown found! ")
+} else {
+dfcalc%>%
+  filter((People == "Yes" & PiN.Target.Oriented == "No") & total_pop_type != 0)%>%
+  ggplot()+
+  aes(x=Country)+
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5, position = position_dodge(.9))+
+  unhcr_theme()+
+    labs(title = "People related indicators with population type data", subtitle = "(People == Yes & PiN.Target.Oriented == No) & total_pop_type != 0")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+}
+
+```
+Indicators that are nor Pin/target oriented nor people oriented shouldn't have data in the beneficiaries columns. 
+
+``` {r nopplnopin }
+nopplnopin<- dfcalc%>%
+  filter(PiN.Target.Oriented == "No" & People == "No" & total_pop_type != 0 & total_breakdown != 0 & Total.monthly.beneficiaries != 0 & New.beneficiaries.of.the.month != 0)
+  
+  
+if(nrow(nopplnopin) == 0) {
+  print("Other indicators do not contain beneficiaries related information ")
+} else {  
+dfcalc%>%
+  filter(PiN.Target.Oriented == "No" & People == "No" & total_pop_type != 0 & total_breakdown != 0 & Total.monthly.beneficiaries != 0 & New.beneficiaries.of.the.month != 0) %>%
+  ggplot()+
+  aes(x=Country)+
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5, position = position_dodge(.9))+
+  unhcr_theme()+
+    labs(title = "Not Pin Not People indicators with benficiaries", subtitle = "Filter: Not People oriented indicators and Not Pin / Target oriented indicator")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+} 
+
+```
+
+Pin and People oriented indicators should not have data in the "Quantity of unit measured" as their data should appear in Total and New beneficiaries columns. 
+
+``` {r quantity }
+quantity<- dfcalc%>%
+  filter(Quantity.of.unit.measured != 0 & (People == "Yes" | PiN.Target.Oriented == "Yes"))
+  
+  
+if(nrow(quantity) == 0) {
+  print("All the quantity values do not reflect beneficiaries or people values!")
+} else {  
+dfcalc%>%
+   filter(Quantity.of.unit.measured != 0 & (People == "Yes" | PiN.Target.Oriented == "Yes")) %>%
+  ggplot()+
+  aes(x=Country)+
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5, position = position_dodge(.9))+
+  unhcr_theme()+
+    labs(title = "PiN or People indicators with Quantity values registered", subtitle = "Pleasze verify the quantity column")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.95, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank())
+} 
+
+```

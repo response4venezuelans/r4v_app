@@ -1,0 +1,12 @@
+name: Shiny_Quality_Report
+title: Shiny_Quality_Report
+username:
+account: r4vapp
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3844995
+bundleId: 4480375
+url: https://r4vapp.shinyapps.io/Shiny_Quality_Report/
+when: 1618583851.2617
+asMultiple: FALSE
+asStatic: FALSE
