@@ -18,39 +18,38 @@
 r4v_pull_xlsdata <- function(data)
   
 {
-  dfxls <- data
+  df <- data
   
-  df <- dfxls %>%
-    transmute(
-      `Appealing.Organization.Name` = `Appealing Organization`,
-      `Implementation.Set.up` = `Implementation Set-up*`,
-      `Implementing.partner.Name` = `Implementing partner`,
-      `Reporting.Month` = `Reporting month`,
-      `Sector...Subsector...WG` = `Sector - Subsector -WG`,
-      `Indicator` = `Indicator`,
-      `Activity.name` = `Activity name`,
-      `Activity.description` = `Activity description`,
-      `RMRP.Activity` = `RMRP Activity`,
-      `COVID.19.situation` = `COVID-19 situation?*`,
-      `Support.Space.activity` = `Support Space activity?`,
-      `CVA` = `CVA`,
-      `Value.of.Transfer.in.USD` = `Value of Transfer in USD*`,
-      `Delivery.Mechanism` = `Delivery Mechanism*`,
-      `Country` = `Country`,
-      `Admin1` = `Admin1`,
-      `Quantity.of.unit.measured` = `Quantity of unit measured`,
-      `Total.monthly.beneficiaries` = `Total monthly beneficiaries`,
-      `New.beneficiaries.of.the.month`  = `New beneficiaries of the month`,
-      `Refugees.and.Migrants.IN.DESTINATION` = `Refugees and Migrants IN DESTINATION`,
-      `Refugees.and.Migrants.IN.TRANSIT` = `Refugees and Migrants IN TRANSIT`,
-      `Host.Communities.Beneficiaries` =  `Host Communities beneficiaries`,
-      `Refugees.and.Migrants.PENDULARS` = `Refugees and Migrants PENDULARS`,
-      `Colombian.Returnees` = `Colombian returnees`,
-      `Women.under.18` = `Women under 18 years old`,
-      `Men.under.18` = `Men under 18 years old`,
-      `Women.above.18` = `Women above 18`,
-      `Men.above.18` = `Men above 18`
-    )
+  colnames(df) <- c("Appealing.Organization.Name",
+                    "Implementation.Set.up",
+                    "Implementing.partner.Name",
+                    "Reporting.Month",
+                    "Sector...Subsector...WG",
+                    "Indicator",
+                    "Activity.name",
+                    "Activity.description",
+                    "RMRP.Activity",
+                    "COVID.19.situation",
+                    "Support.Space.activity",
+                    "CVA",
+                    "Value.of.Transfer.in.USD",
+                    "Delivery.Mechanism",
+                    "Country",
+                    "Admin1",
+                    "Quantity.of.unit.measured",
+                    "Total.monthly.beneficiaries",
+                    "New.beneficiaries.of.the.month",
+                    "Refugees.and.Migrants.IN.DESTINATION",
+                    "Refugees.and.Migrants.IN.TRANSIT",
+                    "Host.Communities.Beneficiaries",
+                    "Refugees.and.Migrants.PENDULARS",
+                    "Colombian.Returnees",
+                    "Women.under.18",
+                    "Men.under.18",
+                    "Women.above.18",
+                    "Men.above.18"
+  )   
+  
   
   # Convert the beneficiaries related columns to numeric and change NA to 0s to ensure that the calculations are correct
   df <- df%>%

@@ -94,6 +94,31 @@ r4v_pull_aidata <- function()
                       "Admin1" = "cfb24tnkh4x1tdu5i",
                       "ISOCODE" = "cz0uashkh4x21e25j", truncate.strings = FALSE)
   
+  # Load the Appealing organisation and Implementing partners table
+  
+  dforg <- queryTable("c4ba6mbkh4v6p442",
+                      "IDORG" = "c5k7qoukh4v7yhi3",
+                      "Name" = "name",
+                      "Nombre" = "crtefhakh4v8oug4",
+                      "Nome" = "cqfgoaukh4v9ejg5",
+                      "Acronym/Short Name" = "cvzkt1zkh4v9snu6",
+                      "Type" = "cxt8hhakh4vao1oc",
+                      "Regional" = "cnivg3okkgxfji7d",
+                      "Platform" = "ca4trickh4vcfy5o",
+                      "Changes contrl" = "cn9r7uokm5g230i7")
+  
+  dfIP <- queryTable("c8j53vukkgxdcva2e",
+                     "IDIP" = "ca9gplmklh387ez2",
+                     "IDORG" = "c5k7qoukh4v7yhi3",
+                     "Name" = "name",
+                     "Nombre" = "crtefhakh4v8oug4",
+                     "Nome" = "cqfgoaukh4v9ejg5",
+                     "Acronym/Short Name" = "cvzkt1zkh4v9snu6",
+                     "Type" = "cxt8hhakh4vao1oc",
+                     "Platform" = "ca4trickh4vcfy5o",
+                     "Changes Control" = "c2cpycykm5fut5z7")
+  
+  
   # Change months name for more readability
   
   df$Reporting.Month [df$Reporting.Month == "2021-01"] <- "January"
@@ -129,9 +154,10 @@ r4v_pull_aidata <- function()
   writexl::write_xlsx(df, './data-raw/RMRP_2021_AI_activities.xlsx')
   writexl::write_xlsx(dfindicator, './data-raw/RMRP_2021_AI_indicators.xlsx')
   writexl::write_xlsx(dfGIS, './data-raw/RMRP_2021_AI_GIS.xlsx')
+  writexl::write_xlsx(dforg, './data-raw/RMRP_2021_AI_partners.xlsx')
+  writexl::write_xlsx(dfIP, './data-raw/RMRP_2021_AI_IP.xlsx')
   
   return(df)
   
 }
-
 

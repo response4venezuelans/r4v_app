@@ -14,6 +14,7 @@ r4v_error_report <- function(data,countryname = NULL,
                              rounding_diff1 = "TRUE", 
                              pin_erase_quantity = "TRUE", 
                              people_fill = "TRUE",
+                             total_lower_new_people = "TRUE",
                              people_erase_extradata = "TRUE",
                              other_fill = "TRUE", 
                              other_erase_extradata = "TRUE")
@@ -46,8 +47,21 @@ r4v_error_report <- function(data,countryname = NULL,
   
   dfapportioning <- read_excel( './data/RMRP_2021_Apportioning.xlsx')
   
-  ## Filter the data by the country you are interested in reviewing.
+  ## Partners and IP lists
   
+  dfpartner <- read_excel( './data-raw/RMRP_2021_AI_partners.xlsx')
+  dfIP <- read_excel( './data-raw/RMRP_2021_AI_IP.xlsx')
+  
+  ##  Vector creation for categorical data check
+  
+  indicatorlist <- as.vector(dfindicator["Indicator"])
+  sectorlist <- as.vector(unique(dfindicator["Sector...Subsector...WG"]))
+  countrylist <- as.vector(unique(dfGIS["Country"]))
+  admin1list <- as.vector(dfGIS["Admin1"])
+  partnerlist <- as.vector(dfpartner["Name"])
+  iplist <- as.vector(dfIP["Name"])
+  
+  ## Filter the data by the country you are interested in reviewing.
   #Shiny
   
   if (is.null(countryname) || (countryname=="All")) {
@@ -61,16 +75,24 @@ r4v_error_report <- function(data,countryname = NULL,
   dfindicator2 <- MyCountrydf2021%>%
     left_join(dfindicator, by = c("Sector...Subsector...WG", "Indicator"))
   
+  dfindicator2 <- dfindicator2%>%
+    mutate_at(c("Quantity.of.unit.measured",'Refugees.and.Migrants.IN.DESTINATION', "Refugees.and.Migrants.IN.TRANSIT","Refugees.and.Migrants.PENDULARS", "Host.Communities.Beneficiaries", "Colombian.Returnees"), as.numeric)
+  
+  dfindicator2[, 17:28][is.na(dfindicator2[, 17:28])] <- 0 
+  
   # The list of the errors that are checked by the RMRP Quality check report are listed in the "Data Quality Check points" file in the docs folder
   
   dferrors <- dfindicator2 %>%
     rowwise()%>%
-    mutate(Missing.Appealing.org.name = ifelse(is.na(Appealing.Organization.Name), "ERROR", ""),
+    mutate(Missing.Appealing.org.name = ifelse(!is.na(Appealing.Organization.Name) & 
+                                                 any(Appealing.Organization.Name == partnerlist), "", "ERROR"),
            Missing.Implementation.Setup = ifelse(is.na(Implementation.Set.up), "ERROR", ""),
-           Missing.ImplementingPartner = ifelse(Implementation.Set.up == "Yes" & is.na(Implementing.partner.Name), "ERROR", ""),
-           Missing.Sector = ifelse(is.na(Sector...Subsector...WG), "ERROR", ""),
+           Missing.ImplementingPartner = ifelse(Implementation.Set.up == "Yes" & 
+                                                  (is.na(Implementing.partner.Name) | 
+                                                     !any(Implementing.partner.Name == iplist)), "ERROR", ""),
+           Missing.Sector = ifelse(!is.na(Sector...Subsector...WG) & any(Sector...Subsector...WG == sectorlist), "", "ERROR"),
            Missing.Month = ifelse(is.na(Reporting.Month), "ERROR", ""),
-           Missing.Indicator = ifelse(is.na(Indicator), "ERROR", ""),
+           Missing.Indicator = ifelse(!is.na(Indicator) & any(Indicator == indicatorlist), "", "ERROR"),
            Missing.Activity.Name = ifelse(is.na(Activity.name), "ERROR", ""),
            Missing.covid19 = ifelse(is.na(COVID.19.situation), "ERROR", ""),
            Missing.RMRP.Activity = ifelse(is.na(RMRP.Activity), "ERROR", ""),
@@ -78,7 +100,7 @@ r4v_error_report <- function(data,countryname = NULL,
            Non.CVA.Indicators.with.Value = ifelse((CVA == "No" & (!is.na(Value.of.Transfer.in.USD)| Value.of.Transfer.in.USD != 0) & 
                                                      !is.na(Delivery.Mechanism)), "ERROR", ""),
            CVA.Indicator.with.Missing.Value = ifelse((CVA == "Yes" & (is.na(Value.of.Transfer.in.USD)| is.na(Delivery.Mechanism))), "ERROR", ""),
-           Missing.CountryAdmin1 = ifelse(is.na(Country) | is.na(Admin1), "ERROR", ""),
+           Missing.CountryAdmin1 = ifelse((!is.na(Country) & any(Country == countrylist))&(!is.na(Admin1) & any(Admin1 == admin1list)), "", "ERROR"),
            Pin.Beneficiaries.vs.AGbreakdown = ifelse(Indicator_Type =="Pin" & (New.beneficiaries.of.the.month != 
                                                                                  (sum(Women.under.18 + Men.under.18 + Women.above.18 + 
                                                                                         Men.above.18,na.rm=TRUE))), "ERROR", ""),
@@ -88,15 +110,16 @@ r4v_error_report <- function(data,countryname = NULL,
                                                                                                                      Refugees.and.Migrants.PENDULARS + 
                                                                                                                      Colombian.Returnees, na.rm = TRUE)), "ERROR", ""),
            New.beneficiaries.superior.to.total = ifelse(Indicator_Type =="Pin" & New.beneficiaries.of.the.month > Total.monthly.beneficiaries, "ERROR", ""),
-           People.Beneficiaries.vs.AGbreakdown = ifelse(Indicator_Type =="People" & (Quantity.of.unit.measured != 
+           People.Beneficiaries.vs.AGbreakdown = ifelse(Indicator_Type =="People" & (New.beneficiaries.of.the.month != 
                                                                                        sum(Women.under.18 + Men.under.18 + Women.above.18 + 
                                                                                              Men.above.18, na.rm = TRUE)), "ERROR", ""),
-           Pin.Beneficaries.equal.0 = ifelse(Indicator_Type =="Pin" & Total.monthly.beneficiaries == 0 & New.beneficiaries.of.the.month == 0, "ERROR", ""),
-           PeopleandOther.quantity.equal.0 = ifelse(Indicator_Type !="Pin" & Quantity.of.unit.measured == 0, "ERROR", ""),
+           PinPeople.Beneficaries.equal.0 = ifelse(Indicator_Type !="Other" & Total.monthly.beneficiaries == 0 & New.beneficiaries.of.the.month == 0, "ERROR", ""),
+           Other.quantity.equal.0 = ifelse(Indicator_Type =="Other" & Quantity.of.unit.measured == 0, "ERROR", ""),
            Empty.data = ifelse(sum(Quantity.of.unit.measured + Total.monthly.beneficiaries +  New.beneficiaries.of.the.month +
                                      Refugees.and.Migrants.IN.DESTINATION + Refugees.and.Migrants.IN.TRANSIT + Host.Communities.Beneficiaries + 
                                      Refugees.and.Migrants.PENDULARS + Colombian.Returnees + Women.under.18 + 
-                                     Men.under.18 + Women.above.18 + Men.above.18,na.rm =TRUE) == 0, "ERROR", ""))
+                                     Men.under.18 + Women.above.18 + Men.above.18,na.rm =TRUE) == 0, "ERROR", ""))%>%
+    ungroup()
   
   
   # We drop the indicator table columns to keep the error report with only the columns from the Activity Info database and the error flags
@@ -182,20 +205,21 @@ r4v_error_report <- function(data,countryname = NULL,
   
   #--------------------PIN RELATED INDICATORS CHANGES ------------------------------
   
-  # Pin indicators: If New beneficiaries and Total are equal 0, copy values from breakdowns 
+  # Pin indicators: If New beneficiaries equals 0, copy values from breakdowns 
   # (only if they are equal) or from quantity column, if breakdowns are not equals.
   if(pin_benef_fill == "TRUE")
     dferrors <- dferrors %>%
     rowwise()%>%
-    mutate(New.beneficiaries.of.the.month =  ifelse(Indicator_Type == "Pin" & New.beneficiaries.of.the.month == 0 & Total.monthly.beneficiaries == 0 &
+    mutate(New.beneficiaries.of.the.month =  ifelse(Indicator_Type == "Pin" & New.beneficiaries.of.the.month == 0 &
                                                       sum(Women.under.18 + Men.under.18 + Women.above.18 + Men.above.18, na.rm = TRUE) == 
                                                       sum(Refugees.and.Migrants.IN.DESTINATION + Refugees.and.Migrants.IN.TRANSIT + 
                                                             Host.Communities.Beneficiaries + Refugees.and.Migrants.PENDULARS + Colombian.Returnees, na.rm = TRUE), 
                                                     sum(Women.under.18 + Men.under.18 + Women.above.18 + Men.above.18, na.rm = TRUE), New.beneficiaries.of.the.month),
-           New.beneficiaries.of.the.month = ifelse(Quantity.of.unit.measured != 0 & Indicator_Type == "Pin" & 
-                                                     Total.monthly.beneficiaries == 0 & New.beneficiaries.of.the.month == 0, 
-                                                   Quantity.of.unit.measured, New.beneficiaries.of.the.month),
-    ) 
+           New.beneficiaries.of.the.month = ifelse(Quantity.of.unit.measured != 0 & Indicator_Type == "Pin" &
+                                                     New.beneficiaries.of.the.month == 0, 
+                                                   Quantity.of.unit.measured, New.beneficiaries.of.the.month)
+    )%>%
+    ungroup()
   else if (pin_benef_fill == "FALSE")
     dferrors <- dferrors 
   
@@ -221,7 +245,8 @@ r4v_error_report <- function(data,countryname = NULL,
                                                                  Host.Communities.Beneficiaries + Refugees.and.Migrants.PENDULARS + 
                                                                  Colombian.Returnees, na.rm = TRUE) == 0, 
                                                          New.beneficiaries.of.the.month, Refugees.and.Migrants.IN.DESTINATION)
-    )
+    )%>%
+    ungroup()
   else if (assign_in_destination == "FALSE")
     dferrors <- dferrors 
   
@@ -244,17 +269,18 @@ r4v_error_report <- function(data,countryname = NULL,
                                                          Colombian.Returnees), na.rm = TRUE),
            row_max = var_list2[which.max(across(var_list2))])%>%
     ungroup%>%
-    mutate( Refugees.and.Migrants.IN.DESTINATION = case_when((Indicator_Type == "Pin")&(row_max == "Refugees.and.Migrants.IN.DESTINATION") ~ 
+    mutate( Refugees.and.Migrants.IN.DESTINATION = case_when((Indicator_Type == "Pin")&(row_max == "Refugees.and.Migrants.IN.DESTINATION")&(diff > 0) ~ 
                                                                (Refugees.and.Migrants.IN.DESTINATION + diff), TRUE ~ Refugees.and.Migrants.IN.DESTINATION),
-            Refugees.and.Migrants.IN.TRANSIT = case_when((Indicator_Type == "Pin")&(row_max == "Refugees.and.Migrants.IN.TRANSIT") ~ 
+            Refugees.and.Migrants.IN.TRANSIT = case_when((Indicator_Type == "Pin")&(row_max == "Refugees.and.Migrants.IN.TRANSIT")&(diff > 0) ~ 
                                                            (Refugees.and.Migrants.IN.TRANSIT + diff), TRUE ~ Refugees.and.Migrants.IN.TRANSIT),
-            Refugees.and.Migrants.PENDULARS = case_when((Indicator_Type == "Pin")&(row_max == "Refugees.and.Migrants.PENDULARS") ~ 
+            Refugees.and.Migrants.PENDULARS = case_when((Indicator_Type == "Pin")&(row_max == "Refugees.and.Migrants.PENDULARS")&(diff > 0) ~ 
                                                           (Refugees.and.Migrants.PENDULARS + diff), TRUE ~ Refugees.and.Migrants.PENDULARS),
-            Host.Communities.Beneficiaries = case_when((Indicator_Type == "Pin")&(row_max == "Host.Communities.Beneficiaries") ~ 
+            Host.Communities.Beneficiaries = case_when((Indicator_Type == "Pin")&(row_max == "Host.Communities.Beneficiaries")&(diff > 0) ~ 
                                                          (Host.Communities.Beneficiaries + diff), TRUE ~ Host.Communities.Beneficiaries),
-            Colombian.Returnees = case_when((Indicator_Type == "Pin")&(row_max == "Colombian.Returnees") ~ 
+            Colombian.Returnees = case_when((Indicator_Type == "Pin")&(row_max == "Colombian.Returnees")&(diff > 0) ~ 
                                               (Colombian.Returnees + diff), TRUE ~ Colombian.Returnees)
     )%>%
+    ungroup()%>%
     select(-59, -60)
   else if (assign_all_destination == "FALSE")
     dferrors <- dferrors
@@ -313,6 +339,7 @@ r4v_error_report <- function(data,countryname = NULL,
             Women.above.18 = case_when((Indicator_Type == "Pin")&(row_max == "Women.above.18")&(abs(diff)<=2) ~ (Women.above.18 + diff), TRUE ~ Women.above.18),
             Men.above.18 = case_when((Indicator_Type == "Pin")&(row_max == "Men.above.18")&(abs(diff)<=2) ~ (Men.above.18 + diff), TRUE ~ Men.above.18)
     )%>%
+    ungroup()%>%
     select(-59, -60)
   else if (rounding_diff1 == "FALSE")
     dferrors <- dferrors
@@ -329,19 +356,32 @@ r4v_error_report <- function(data,countryname = NULL,
   
   ##--------------------PEOPLE RELATED INDICATORS CHANGES ------------------------------
   
-  # People indicators: if Quantity of unit equal 0, copy values from Total of beneficiaries 
-  # or if total empty,  from age and gender breakdown sum
+  # People indicators: if New beneficaries of unit equal 0, copy values from age and gender breakdown sum 
+  # or if total empty,  copy values from Quantity of unit measured
   
   if(people_fill == "TRUE")
     dferrors <- dferrors %>%
     rowwise()%>%
-    mutate(Quantity.of.unit.measured =  ifelse(Indicator_Type == "People" & Quantity.of.unit.measured == 0, 
-                                               Total.monthly.beneficiaries, Quantity.of.unit.measured),
-           Quantity.of.unit.measured = ifelse(Indicator_Type == "People" & Quantity.of.unit.measured == 0,
-                                              sum(Women.under.18 + Men.under.18 + Women.above.18 + Men.above.18, na.rm = TRUE),
-                                              Quantity.of.unit.measured)
-    ) 
+    mutate(New.beneficiaries.of.the.month =  ifelse(Indicator_Type == "People" & New.beneficiaries.of.the.month == 0, 
+                                                    sum(Women.under.18 + Men.under.18 + 
+                                                          Women.above.18 + Men.above.18, na.rm = TRUE) , New.beneficiaries.of.the.month),
+           New.beneficiaries.of.the.month = ifelse(Indicator_Type == "People" & New.beneficiaries.of.the.month == 0,
+                                                   Quantity.of.unit.measured, New.beneficiaries.of.the.month)
+    )%>%
+    ungroup()
   else if (people_fill == "FALSE")
+    dferrors <- dferrors
+  
+  # For People Indicators, when Total is lower than New beneficiaries, copy the New beneficiaries 
+  # value to total
+  
+  if(total_lower_new_people == "TRUE")
+    dferrors <- dferrors %>%
+    mutate( Total.monthly.beneficiaries =  ifelse(Indicator_Type == "People" & 
+                                                    Total.monthly.beneficiaries < New.beneficiaries.of.the.month, 
+                                                  New.beneficiaries.of.the.month, Total.monthly.beneficiaries)
+    ) 
+  else if (total_lower_new_people == "FALSE")
     dferrors <- dferrors
   
   # For People indicators: as People indicators should not contain data in population type breakdown, 
@@ -349,8 +389,7 @@ r4v_error_report <- function(data,countryname = NULL,
   
   if(people_erase_extradata == "TRUE")
     dferrors <- dferrors%>%
-    mutate(Total.monthly.beneficiaries = ifelse(Indicator_Type == "People", 0, Total.monthly.beneficiaries),
-           New.beneficiaries.of.the.month = ifelse(Indicator_Type == "People", 0, New.beneficiaries.of.the.month),
+    mutate(Quantity.of.unit.measured = ifelse(Indicator_Type == "People", 0, Quantity.of.unit.measured),
            Refugees.and.Migrants.IN.DESTINATION = ifelse(Indicator_Type == "People", 0, Refugees.and.Migrants.IN.DESTINATION),
            Refugees.and.Migrants.IN.TRANSIT = ifelse(Indicator_Type == "People", 0, Refugees.and.Migrants.IN.TRANSIT),
            Refugees.and.Migrants.PENDULARS = ifelse(Indicator_Type == "People", 0, Refugees.and.Migrants.PENDULARS),
@@ -383,11 +422,11 @@ r4v_error_report <- function(data,countryname = NULL,
            Refugees.and.Migrants.IN.TRANSIT = ifelse(Indicator_Type == "Other", 0, Refugees.and.Migrants.IN.TRANSIT),
            Refugees.and.Migrants.PENDULARS = ifelse(Indicator_Type == "Other", 0, Refugees.and.Migrants.PENDULARS),
            Host.Communities.Beneficiaries = ifelse(Indicator_Type == "Other", 0, Host.Communities.Beneficiaries),
-           Colombian.Returnees = ifelse(Indicator_Type == "People", 0, Colombian.Returnees),
-           Women.under.18 = ifelse(Indicator_Type == "People", 0, Women.under.18),
-           Men.under.18 = ifelse(Indicator_Type == "People", 0, Men.under.18),
-           Women.above.18 = ifelse(Indicator_Type == "People", 0, Women.above.18),
-           Men.above.18 = ifelse(Indicator_Type == "People", 0, Men.above.18),
+           Colombian.Returnees = ifelse(Indicator_Type == "Other", 0, Colombian.Returnees),
+           Women.under.18 = ifelse(Indicator_Type == "Other", 0, Women.under.18),
+           Men.under.18 = ifelse(Indicator_Type == "Other", 0, Men.under.18),
+           Women.above.18 = ifelse(Indicator_Type == "Other", 0, Women.above.18),
+           Men.above.18 = ifelse(Indicator_Type == "Other", 0, Men.above.18),
     )
   else if (other_erase_extradata == "FALSE")
     dferrors <- dferrors
@@ -398,12 +437,15 @@ r4v_error_report <- function(data,countryname = NULL,
   
   dferrorsclean <- dferrors %>%
     rowwise()%>%
-    mutate(Missing.Appealing.org.name = ifelse(is.na(Appealing.Organization.Name), "ERROR", ""),
+    mutate(Missing.Appealing.org.name = ifelse(!is.na(Appealing.Organization.Name) & 
+                                                 any(Appealing.Organization.Name == partnerlist), "", "ERROR"),
            Missing.Implementation.Setup = ifelse(is.na(Implementation.Set.up), "ERROR", ""),
-           Missing.ImplementingPartner = ifelse(Implementation.Set.up == "Yes" & is.na(Implementing.partner.Name), "ERROR", ""),
-           Missing.Sector = ifelse(is.na(Sector...Subsector...WG), "ERROR", ""),
+           Missing.ImplementingPartner = ifelse(Implementation.Set.up == "Yes" & 
+                                                  (is.na(Implementing.partner.Name) | 
+                                                     !any(Implementing.partner.Name == iplist)), "ERROR", ""),
+           Missing.Sector = ifelse(!is.na(Sector...Subsector...WG) & any(Sector...Subsector...WG == sectorlist), "", "ERROR"),
            Missing.Month = ifelse(is.na(Reporting.Month), "ERROR", ""),
-           Missing.Indicator = ifelse(is.na(Indicator), "ERROR", ""),
+           Missing.Indicator = ifelse(!is.na(Indicator) & any(Indicator == indicatorlist), "", "ERROR"),
            Missing.Activity.Name = ifelse(is.na(Activity.name), "ERROR", ""),
            Missing.covid19 = ifelse(is.na(COVID.19.situation), "ERROR", ""),
            Missing.RMRP.Activity = ifelse(is.na(RMRP.Activity), "ERROR", ""),
@@ -411,7 +453,7 @@ r4v_error_report <- function(data,countryname = NULL,
            Non.CVA.Indicators.with.Value = ifelse((CVA == "No" & (!is.na(Value.of.Transfer.in.USD)| Value.of.Transfer.in.USD != 0) & 
                                                      !is.na(Delivery.Mechanism)), "ERROR", ""),
            CVA.Indicator.with.Missing.Value = ifelse((CVA == "Yes" & (is.na(Value.of.Transfer.in.USD)| is.na(Delivery.Mechanism))), "ERROR", ""),
-           Missing.CountryAdmin1 = ifelse(is.na(Country) | is.na(Admin1), "ERROR", ""),
+           Missing.CountryAdmin1 = ifelse((!is.na(Country) & any(Country == countrylist))&(!is.na(Admin1) & any(Admin1 == admin1list)), "", "ERROR"),
            Pin.Beneficiaries.vs.AGbreakdown = ifelse(Indicator_Type =="Pin" & (New.beneficiaries.of.the.month != 
                                                                                  (sum(Women.under.18 + Men.under.18 + Women.above.18 + 
                                                                                         Men.above.18,na.rm=TRUE))), "ERROR", ""),
@@ -421,15 +463,16 @@ r4v_error_report <- function(data,countryname = NULL,
                                                                                                                      Refugees.and.Migrants.PENDULARS + 
                                                                                                                      Colombian.Returnees, na.rm = TRUE)), "ERROR", ""),
            New.beneficiaries.superior.to.total = ifelse(Indicator_Type =="Pin" & New.beneficiaries.of.the.month > Total.monthly.beneficiaries, "ERROR", ""),
-           People.Beneficiaries.vs.AGbreakdown = ifelse(Indicator_Type =="People" & (Quantity.of.unit.measured != 
+           People.Beneficiaries.vs.AGbreakdown = ifelse(Indicator_Type =="People" & (New.beneficiaries.of.the.month != 
                                                                                        sum(Women.under.18 + Men.under.18 + Women.above.18 + 
                                                                                              Men.above.18, na.rm = TRUE)), "ERROR", ""),
-           Pin.Beneficaries.equal.0 = ifelse(Indicator_Type =="Pin" & Total.monthly.beneficiaries == 0 & New.beneficiaries.of.the.month == 0, "ERROR", ""),
-           PeopleandOther.quantity.equal.0 = ifelse(Indicator_Type !="Pin" & Quantity.of.unit.measured == 0, "ERROR", ""),
+           PinPeople.Beneficaries.equal.0 = ifelse(Indicator_Type !="Other" & Total.monthly.beneficiaries == 0 & New.beneficiaries.of.the.month == 0, "ERROR", ""),
+           Other.quantity.equal.0 = ifelse(Indicator_Type =="Other" & Quantity.of.unit.measured == 0, "ERROR", ""),
            Empty.data = ifelse(sum(Quantity.of.unit.measured + Total.monthly.beneficiaries +  New.beneficiaries.of.the.month +
                                      Refugees.and.Migrants.IN.DESTINATION + Refugees.and.Migrants.IN.TRANSIT + Host.Communities.Beneficiaries + 
                                      Refugees.and.Migrants.PENDULARS + Colombian.Returnees + Women.under.18 + 
                                      Men.under.18 + Women.above.18 + Men.above.18,na.rm =TRUE) == 0, "ERROR", ""))%>%
+    ungroup()%>%
     select(-(29:34), -(55:58))%>%
     mutate(ERROR = NA)
   
