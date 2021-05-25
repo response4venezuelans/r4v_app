@@ -25,9 +25,7 @@ r4v_pull_aidata <- function()
   
   ## Credentials in an external file
   source("R/activityInfoLogin.R")
-  activityinfo::activityInfoLogin("fayolle@unhcr.org", "126c199a4206a96f62a3d4f88e996c33")
-  
-  
+
   ################################################
   
   # This import the 2021 database and export a simple xlsx file
@@ -64,6 +62,18 @@ r4v_pull_aidata <- function()
                    "Women above 18" = "cwvbcp4kh4zc4aneg",
                    "Men above 18" = "cxh7c03kh4zcmhneh", truncate.strings = FALSE)
   
+  # Convert the beneficiaries related columns to numeric and change NA to 0s to ensure that the calculations are correct
+  
+  df <- df%>%
+    mutate_at(c("Value.of.Transfer.in.USD", 
+                "Quantity.of.unit.measured",
+                'Refugees.and.Migrants.IN.DESTINATION', 
+                "Refugees.and.Migrants.IN.TRANSIT",
+                "Refugees.and.Migrants.PENDULARS", 
+                "Host.Communities.Beneficiaries", 
+                "Colombian.Returnees"), as.numeric)
+  
+  df[, 17:28][is.na(df[, 17:28])] <- 0
   
   # load dataframe indicator
   
@@ -105,7 +115,7 @@ r4v_pull_aidata <- function()
                       "Type" = "cxt8hhakh4vao1oc",
                       "Regional" = "cnivg3okkgxfji7d",
                       "Platform" = "ca4trickh4vcfy5o",
-                      "Changes contrl" = "cn9r7uokm5g230i7")
+                      "Changes contrl" = "cn9r7uokm5g230i7", truncate.strings = FALSE)
   
   dfIP <- queryTable("c8j53vukkgxdcva2e",
                      "IDIP" = "ca9gplmklh387ez2",
@@ -116,30 +126,10 @@ r4v_pull_aidata <- function()
                      "Acronym/Short Name" = "cvzkt1zkh4v9snu6",
                      "Type" = "cxt8hhakh4vao1oc",
                      "Platform" = "ca4trickh4vcfy5o",
-                     "Changes Control" = "c2cpycykm5fut5z7")
+                     "Changes Control" = "c2cpycykm5fut5z7", truncate.strings = FALSE)
   
   
-  # Change months name for more readability
   
-  df$Reporting.Month [df$Reporting.Month == "2021-01"] <- "January"
-  df$Reporting.Month [df$Reporting.Month == "2021-02"] <- "February"
-  df$Reporting.Month [df$Reporting.Month == "2021-03"] <- "March"
-  df$Reporting.Month [df$Reporting.Month == "2021-04"] <- "April" 
-  df$Reporting.Month [df$Reporting.Month == "2021-05"] <- "May"
-  df$Reporting.Month [df$Reporting.Month == "2021-06"] <- "June"
-  df$Reporting.Month [df$Reporting.Month == "2021-07"] <- "July"
-  df$Reporting.Month [df$Reporting.Month == "2021-08"] <- "August"
-  df$Reporting.Month [df$Reporting.Month == "2021-09"] <- "September"
-  df$Reporting.Month [df$Reporting.Month == "2021-10"] <- "October"
-  df$Reporting.Month [df$Reporting.Month == "2021-11"] <- "November"
-  df$Reporting.Month [df$Reporting.Month == "2021-12"] <- "December"
-  
-  # Convert the beneficiaries related columns to numeric and change NA to 0s to ensure that the calculations are correct
-  
-  df <- df%>%
-    mutate_at(c("Quantity.of.unit.measured",'Refugees.and.Migrants.IN.DESTINATION', "Refugees.and.Migrants.IN.TRANSIT","Refugees.and.Migrants.PENDULARS", "Host.Communities.Beneficiaries", "Colombian.Returnees"), as.numeric)
-  
-  df[, 17:28][is.na(df[, 17:28])] <- 0 
   
   # Drop unused columns in both indicators table
   

@@ -6,7 +6,7 @@ dashboardPage(
     img(src = "r4v.png", height = 80),
     tabsetPanel(
       tabPanel(title = "1.Data Upload",br(),
-               p("WORK IN PROGRESS, please send any comments to the Regional platform IM team", style="color: #fff; background-color: #672D53"),
+               p("V2 Updated 25/05/2021, please send any comments to the Regional platform IM team", style="color: #fff; background-color: #672D53"),
                
                  
                  column(8,shinydashboard::box(id="box_2", title = "Please copy paste the data with the header or upload you regional ENG 5W import table or load all the records from the API", solidHeader = T,collapsible = T,collapsed = F,
@@ -51,7 +51,7 @@ dashboardPage(
                
       ),
       tabPanel(title = "2.Error and cleaning script",br(),
-               p("WORK IN PROGRESS, please send any comments to the Regional platform IM team", style="color: #fff; background-color: #672D53"),
+               p("V2 Updated 25/05/2021, please send any comments to the Regional platform IM team", style="color: #fff; background-color: #672D53"),
                
                fluidRow(
                  
@@ -117,12 +117,12 @@ dashboardPage(
                # GRAPH
                
                fluidRow(
-                 # column(12,shinydashboard::box(id="box_14", title = "Error per org and Country", solidHeader = T,collapsible = T,collapsed = T,
-                 #                               width = 12,status = "primary",
-                 #                               fluidRow(  column(6,plotlyOutput("plot")),
-                 #                                          column(6,plotlyOutput("plot2"))                          
-                 #                                          
-                 #                               ))) ,
+                 column(12,shinydashboard::box(id="box_14", title = "Error per org and Country", solidHeader = T,collapsible = T,collapsed = F,
+                                               width = 12,status = "primary",
+                                               fluidRow(  column(6,plotlyOutput("plot")),
+                                                          column(6,plotlyOutput("plot2"))
+                                                          
+                                               ))) ,
                  # 
                  
                  
@@ -136,12 +136,12 @@ dashboardPage(
       ),
       
       tabPanel(title = "3.Consolidated report",br(),
-               p("WORK IN PROGRESS, please send any comments to the Regional platform IM team", style="color: #fff; background-color: #672D53"),
+               p("V2 Updated 25/05/2021, please send any comments to the Regional platform IM team", style="color: #fff; background-color: #672D53"),
                fluidRow(column(8,shinydashboard::box(id="box_5", title = "Consolidated Report creation", solidHeader = T,collapsible = T,collapsed = F,
                                                      width = 12,status = "primary",
                                                      p("Please select your country and the aggregation method you want to apply and RUN SCRIPT"),
                                                      selectInput("country_name_agg",label = "Country Name",choices = c("NULL")),
-                                                     radioButtons(inline = TRUE, "totalmodel_agg",label = "Aggregation Model",choices = c("sum","maxagegender","maxsector")),
+                                                     radioButtons(inline = TRUE, "totalmodel_agg",label = "Aggregation Model",choices = c("sum","maxagegender","maxsector", "conosurmodel")),
                                                      actionButton("run_aggregation",label = "Run Script",icon = icon("battle-net"), style="color: #fff; background-color: #00AAAD"),
                                                      downloadButton("downloadData", "Download consolidated report", style="color: #fff; background-color: #672D53")))),
                
