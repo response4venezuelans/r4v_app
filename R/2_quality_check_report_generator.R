@@ -207,6 +207,7 @@ r4v_error_report <- function(data,countryname = NULL,
     dferrors <- dferrors %>%
     rowwise()%>%
     mutate(New.beneficiaries.of.the.month =  ifelse(Indicator_Type == "Pin" & New.beneficiaries.of.the.month == 0 &
+                                                      Total.monthly.beneficiaries == 0 &
                                                       sum(Women.under.18,
                                                           Men.under.18, 
                                                           Women.above.18, 
@@ -221,7 +222,7 @@ r4v_error_report <- function(data,countryname = NULL,
                                                         Women.above.18, 
                                                         Men.above.18, na.rm = TRUE), New.beneficiaries.of.the.month),
            New.beneficiaries.of.the.month = ifelse(Quantity.of.unit.measured != 0 & Indicator_Type == "Pin" &
-                                                     New.beneficiaries.of.the.month == 0, 
+                                                     New.beneficiaries.of.the.month == 0 &  Total.monthly.beneficiaries == 0, 
                                                    Quantity.of.unit.measured, New.beneficiaries.of.the.month)
     )%>%
     ungroup()

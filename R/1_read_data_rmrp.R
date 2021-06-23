@@ -25,7 +25,7 @@ r4v_pull_aidata <- function()
   
   ## Credentials in an external file
   source("R/activityInfoLogin.R")
-
+  
   ################################################
   
   # This import the 2021 database and export a simple xlsx file
