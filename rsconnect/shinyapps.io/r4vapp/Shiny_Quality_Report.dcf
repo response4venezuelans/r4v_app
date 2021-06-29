@@ -5,8 +5,9 @@ account: r4vapp
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3844995
-bundleId: 4639393
+bundleId: 4770278
 url: https://r4vapp.shinyapps.io/Shiny_Quality_Report/
-when: 1621980684.72387
+when: 1624997067.1795
+lastSyncTime: 1624997067.1795
 asMultiple: FALSE
 asStatic: FALSE

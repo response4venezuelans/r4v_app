@@ -55,7 +55,7 @@ r4v_consolidated <- function(data,countryname = NULL, totalmodel = "sum")
       filter(Country == countryname) 
   }
   
-  
+
   # Get the TOTAL MONTHLY number of persons per sector of activity
   # PiN Indicators grouped by sectors
   
@@ -304,7 +304,7 @@ r4v_consolidated <- function(data,countryname = NULL, totalmodel = "sum")
                 Consolidated.Men.above.18 = sum(Consolidated.Men.above.18),
                 Monthly_CVA_Consolidated = sum(Monthly_CVA_Consolidated))
   }
-  
+
   # Bind between the monthly total and consolidated figures
   
   Consolidated0 <- rbind(New_beneficiaries_sectors, monthly_cons_total)
@@ -332,18 +332,18 @@ r4v_consolidated <- function(data,countryname = NULL, totalmodel = "sum")
     rowwise()%>%
     # Add 2 columns to check if the breakdowns are correct. 
     mutate('Check PopType Breakdown' = ifelse(`Consolidated Total` == 0 | (`Consolidated Total` > 0 & 
-                                                                             `Consolidated Total` == sum(`Consolidated In Destination`,
-                                                                                                         `Consolidated In Transit`,
-                                                                                                         `Consolidated Host Communities`,
-                                                                                                         `Consolidated Pendular`,
-                                                                                                         `Consolidated Returnees`,
-                                                                                                         na.rm = TRUE)), "Ok", "Check Population Type breakdown"),
+                                                `Consolidated Total` == sum(`Consolidated In Destination`,
+                                                                                          `Consolidated In Transit`,
+                                                                                          `Consolidated Host Communities`,
+                                                                                          `Consolidated Pendular`,
+                                                                                          `Consolidated Returnees`,
+                                                                                          na.rm = TRUE)), "Ok", "Check Population Type breakdown"),
            'Check AGD Breakdown' = ifelse(`Consolidated Total` == 0 | (`Consolidated Total` > 0 & 
-                                                                         `Consolidated Total`== sum(`Consolidated Girls`,
-                                                                                                    `Consolidated Boys`,
-                                                                                                    `Consolidated Women`,
-                                                                                                    `Consolidated Men`,
-                                                                                                    na.rm = TRUE)), "Ok", "Check AGD breakdown"))%>%
+                                            `Consolidated Total`== sum(`Consolidated Girls`,
+                                                                                      `Consolidated Boys`,
+                                                                                      `Consolidated Women`,
+                                                                                      `Consolidated Men`,
+                                                                                      na.rm = TRUE)), "Ok", "Check AGD breakdown"))%>%
     ungroup()%>%
     select(Platform,
            Country, 
@@ -364,8 +364,9 @@ r4v_consolidated <- function(data,countryname = NULL, totalmodel = "sum")
            `Consolidated Men`,
            `Consolidated CVA Beneficiaries`,
            `Check PopType Breakdown`, 
-           `Check AGD Breakdown`)
-  
+           `Check AGD Breakdown`)%>%
+    mutate(Subsector = ifelse(Subsector == "All", "Total", Subsector))
+
   
   # Print file
   write_xlsx(FinalConsolidated, './out/RMRP_2021_AI_consolidated.xlsx')
@@ -374,7 +375,7 @@ r4v_consolidated <- function(data,countryname = NULL, totalmodel = "sum")
   
   ## SHINY Please do not remove, necessary to fetch data from the function.
   return(FinalConsolidated)
-  
+
   
   
 }
