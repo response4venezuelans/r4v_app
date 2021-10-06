@@ -13,7 +13,7 @@ shinyServer(function(input, output, session) {
   
   # To go back on folder before.
   # setwd("..")
-
+  
   
   imported <- import_copypaste_server("myid")
   
@@ -21,20 +21,20 @@ shinyServer(function(input, output, session) {
   output$status <- renderPrint({
     imported$status() })
   
-    output$data <- renderPrint({
-      source("R/1b_read_data_rmrp.R")
-      # if (imported$data[1:1] = 'Appealing Organization')
-        
+  output$data <- renderPrint({
+    source("R/1b_read_data_rmrp.R")
+    # if (imported$data[1:1] = 'Appealing Organization')
+    
     Data(r4v_pull_xlsdata(imported$data()))
-      showNotification("Data Processing Complete",duration = 10, type = "error")
-      
+    showNotification("Data Processing Complete",duration = 10, type = "error")
+    
     updateSelectInput(session,"country_name",choices = unique(Data()$Country))
     updateSelectInput(session,"country_name_agg",choices = unique(Data()$Country))
+    updateSelectInput(session,"org",choices = c("All",unique(Data()$Appealing.Organization.Name)))
     
-    
-    })
-    
-    
+  })
+  
+  
   # output$data <- renderPrint({
   #   imported$data()
   #   Data(r4v_pull_xlsdata(imported$data()))
@@ -64,24 +64,25 @@ shinyServer(function(input, output, session) {
   observeEvent(
     
     input$data_upload,{
-    filename <- tolower(input$data_upload$name)
-    
-    ## Condition to check file type
-    if(!(sub('.*\\.','',filename)) %in% 'xlsx'){
-      showNotification('Only XLSX are supported',duration = 5)
-      req(F)
-    }
-    # Skip=2 get rid of the 2 toplines as per the template
-    Data(read_excel(input$data_upload$datapath, skip = 2))
-    source("R/1b_read_data_rmrp.R")
-    Data(r4v_pull_xlsdata(Data()))
-    showNotification("Data Processing Complete",duration = 10, type = "error")
-    
-    # Update the drop down button with Countries
-    
-    updateSelectInput(session,"country_name",choices = unique(Data()$Country))
-    updateSelectInput(session,"country_name_agg",choices = unique(Data()$Country))
-  })
+      filename <- tolower(input$data_upload$name)
+      
+      ## Condition to check file type
+      if(!(sub('.*\\.','',filename)) %in% 'xlsx'){
+        showNotification('Only XLSX are supported',duration = 5)
+        req(F)
+      }
+      # Skip=2 get rid of the 2 toplines as per the template
+      Data(read_excel(input$data_upload$datapath, skip = 2))
+      source("R/1b_read_data_rmrp.R")
+      Data(r4v_pull_xlsdata(Data()))
+      showNotification("Data Processing Complete",duration = 10, type = "error")
+      
+      # Update the drop down button with Countries
+      
+      updateSelectInput(session,"country_name",choices = c("All",unique(Data()$Country)))
+      updateSelectInput(session,"country_name_agg",choices = c("All",unique(Data()$Country)))
+      updateSelectInput(session,"org",choices = c("All",unique(Data()$Appealing.Organization.Name)))
+    })
   
   ## Data Preview
   output$Preview_Data <- DT::renderDataTable({Data()},extensions = c("Buttons"), options = list(
@@ -103,6 +104,7 @@ shinyServer(function(input, output, session) {
     showNotification("Data Processing Complete",duration = 10, type = "error")
     updateSelectInput(session,"country_name",choices = c("All",unique(Data()$Country)))
     updateSelectInput(session,"country_name_agg",choices = c("All",unique(Data()$Country)))
+    updateSelectInput(session,"org",choices = c("All",unique(Data()$Appealing.Organization.Name)))
   })
   
   ## run script Check error
@@ -165,8 +167,61 @@ shinyServer(function(input, output, session) {
   
   observeEvent(input$run_aggregation,{
     source("R/6_consolidated_report.R")
-    Consolidated(r4v_consolidated(data = Data(),countryname = input$country_name_agg,totalmodel = input$totalmodel_agg))
+    Consolidated(r4v_consolidated(data = Data(),countryname = input$country_name_agg,org = input$org,totalmodel = input$totalmodel_agg))
     showNotification("Successful",duration = 10, type = "error")
+    conso <- Consolidated()
+    
+    conso$Month <- gsub("2021-","",as.character(conso$Month))
+    conso$Month <- as.numeric(conso$Month)
+    conso <- conso  %>% slice_max(conso$Month, n = 1)
+    
+    
+    
+    reachedcl <- filter(conso, conso$Sector == 'Country level')
+    reached <- sum(reachedcl$`Consolidated Total`)
+    
+    
+    output$reachedorg <- renderText({reached})
+    
+    
+    output$plotorg <- renderPlotly({
+      ggplot(reachedcl) +
+        aes(x = Country, weight = `Consolidated Total`) +
+        geom_bar(fill = "#112446") +
+        coord_flip() +
+        theme_minimal()
+    })
+    
+    
+    
+    # ggplot(conso) +
+    #   aes(
+    #     x = Country,
+    #     fill = Subsector,
+    #     weight = `Consolidated Total`
+    #   ) +
+    #   geom_bar() +
+    #   scale_fill_viridis_d(option = "viridis", direction = 1) +
+    #   coord_flip() +
+    #   theme_minimal()
+    # 
+    # 
+    
+    
+    output$plotorg2 <- renderPlotly({
+      ggplot(conso) +
+        aes(x = Sector,fill = Platform, weight = `Consolidated Total`) +
+        geom_bar() +
+        scale_fill_viridis_d(option = "viridis", direction = 1) +
+        coord_flip() +
+        theme_minimal()
+    })
+    
+    
+    
+    
+    
+    
   })
   
   #Run the RMD report, still need to make by the country selected and need to move the output in Vignettes folder

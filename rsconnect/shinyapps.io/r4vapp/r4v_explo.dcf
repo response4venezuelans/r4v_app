@@ -1,0 +1,13 @@
+name: r4v_explo
+title: r4v_explo
+username:
+account: r4vapp
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4811710
+bundleId: 5110795
+url: https://r4vapp.shinyapps.io/r4v_explo/
+when: 1633533814.4476
+lastSyncTime: 1633533814.4476
+asMultiple: FALSE
+asStatic: FALSE
